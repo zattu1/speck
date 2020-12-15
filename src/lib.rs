@@ -107,26 +107,24 @@ impl ECB for Speck {
         let mut ciphertext: Vec<u8> = Vec::with_capacity(length);
         let mut plain: u128 = 0;
         let mut i: u32 = 0;
-        let mut j: usize = 0;
 
         for it in plaintext.iter() {
-            plain |= (it << (i * 8)) as u128;
+            let j: u128 = (*it).into();
+            plain |= j << (i * 8) as u128;
             i += 1;
             if i == 16 {
-                i = 0;
                 let enc = self.encrypt(&plain);
                 for k in 0..16 {
-                    ciphertext[j] = ((enc >> k) & 0xFFu128) as u8;
-                    j += 1;
+                    ciphertext.push(((enc >> (k * 8)) & 0xFFu128) as u8);
                 }
+                i = 0;
                 plain = 0;
             }
         }
-        if i < 16 {
+        if i > 0 && i < 16 {
             let enc = self.encrypt(&plain);
             for k in 0..16 {
-                ciphertext[j] = ((enc >> k) & 0xFFu128) as u8;
-                j += 1;
+                ciphertext.push(((enc >> (k * 8)) & 0xFFu128) as u8);
             }
         }
         ciphertext
@@ -136,18 +134,17 @@ impl ECB for Speck {
         if (ciphertext.len() % 16) == 0 {
             let mut cipher: u128 = 0;
             let mut i: u32 = 0;
-            let mut j: usize = 0;
 
             for it in ciphertext.iter() {
-                cipher |= (it << (i * 8)) as u128;
+                let j: u128 = (*it).into();
+                cipher |= j << (i * 8) as u128;
                 i += 1;
                 if i == 16 {
-                    i = 0;
                     let dec = self.decrypt(&cipher);
                     for k in 0..16 {
-                        plaintext[j] = ((dec >> k) & 0xFFu128) as u8;
-                        j += 1;
+                        plaintext.push(((dec >> (k * 8)) & 0xFFu128) as u8);
                     }
+                    i = 0;
                     cipher = 0;
                 }
             }
@@ -164,11 +161,33 @@ mod tests {
     fn test_speck128_128_encryption_and_decryption() {
         // Speck128/128 test vectors (see Appendix C in the paper)
         let key: u128 = 0x0f0e0d0c0b0a09080706050403020100;
-        let plaintext = vec![ 0x6c, 0x61, 0x76, 0x69, 0x75, 0x71, 0x65, 0x20, 0x74, 0x69, 0x20, 0x65, 0x64, 0x61, 0x6d, 0x20 ];
-        let ciphertext = vec![ 0xa6, 0x5d, 0x98, 0x51, 0x79, 0x78, 0x32, 0x65, 0x78, 0x60, 0xfe, 0xdf, 0x5c, 0x57, 0x0d, 0x18 ];
+        let plaintext = vec![ 0x20, 0x6d, 0x61, 0x64, 0x65, 0x20, 0x69, 0x74, 0x20, 0x65, 0x71, 0x75, 0x69, 0x76, 0x61, 0x6c ];
+        let ciphertext = vec![ 0x18, 0x0d, 0x57, 0x5c, 0xdf, 0xfe, 0x60, 0x78, 0x65, 0x32, 0x78, 0x79, 0x51, 0x98, 0x5d, 0xa6 ];
 
         let speck = Speck::new(&key);
-        assert_eq!(<Speck as ECB>::encrypt(&plaintext), ciphertext);
-        assert_eq!(<Speck as ECB>::decrypt(&ciphertext), plaintext);
+        assert_eq!(<Speck as ECB>::encrypt(&speck, &plaintext), ciphertext);
+        assert_eq!(<Speck as ECB>::decrypt(&speck, &ciphertext), plaintext);
+    }
+
+    #[test]
+    fn test_speck128_128_encryption_and_decryption2() {
+        // Speck128/128 test vectors (see Appendix C in the paper)
+        let key: u128 = 0x0f0e0d0c0b0a09080706050403020100;
+        let plaintext  = vec![ 0x20, 0x6d, 0x61, 0x64, 0x65, 0x20, 0x69, 0x74,
+                               0x20, 0x65, 0x71, 0x75, 0x69, 0x76, 0x61, 0x6c,
+                               0x20, 0x6d, 0x61, 0x64, 0x65, 0x20, 0x69, 0x74,
+                               0x20, 0x65, 0x71, 0x75, 0x69, 0x76, 0x61 ];
+        let ciphertext = vec![ 0x18, 0x0d, 0x57, 0x5c, 0xdf, 0xfe, 0x60, 0x78,
+                               0x65, 0x32, 0x78, 0x79, 0x51, 0x98, 0x5d, 0xa6,
+                               0x52, 0x74, 0x72, 0xc8, 0xe9, 0x0b, 0xf6, 0xa1,
+                               0xf8, 0xfa, 0x68, 0x33, 0x14, 0xfd, 0xab, 0xe6 ];
+        let plaintext2 = vec![ 0x20, 0x6d, 0x61, 0x64, 0x65, 0x20, 0x69, 0x74,
+                               0x20, 0x65, 0x71, 0x75, 0x69, 0x76, 0x61, 0x6c,
+                               0x20, 0x6d, 0x61, 0x64, 0x65, 0x20, 0x69, 0x74,
+                               0x20, 0x65, 0x71, 0x75, 0x69, 0x76, 0x61, 0x00 ];
+
+        let speck = Speck::new(&key);
+        assert_eq!(<Speck as ECB>::encrypt(&speck, &plaintext), ciphertext);
+        assert_eq!(<Speck as ECB>::decrypt(&speck, &ciphertext), plaintext2);
     }
 }
